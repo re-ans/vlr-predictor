@@ -3,16 +3,7 @@
 import { useEffect, useState } from "react";
 import { getLeaderboard, type LeaderboardResponse } from "@/lib/api";
 import CategoryFilter from "@/components/CategoryFilter";
-
-const REGIONS = [
-  { value: "", label: "All Regions" },
-  { value: "NA", label: "NA" },
-  { value: "WEU", label: "EMEA" },
-  { value: "EEU", label: "EEU" },
-  { value: "SA", label: "SA" },
-  { value: "ASIA", label: "ASIA" },
-  { value: "OCE", label: "OCE" },
-];
+import RegionFilter from "@/components/RegionFilter";
 
 export default function LeaderboardPage() {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
@@ -38,21 +29,7 @@ export default function LeaderboardPage() {
 
       <div className="space-y-3">
         <CategoryFilter value={category} onChange={setCategory} />
-        <div className="flex gap-1.5 flex-wrap">
-          {REGIONS.map((r) => (
-            <button
-              key={r.value}
-              onClick={() => setRegion(r.value)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                region === r.value
-                  ? "bg-accent text-white"
-                  : "bg-card border border-border text-muted hover:text-foreground hover:bg-card-hover"
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
+        <RegionFilter value={region} onChange={setRegion} />
       </div>
 
       {loading && (

@@ -116,9 +116,15 @@ export function getCategories() {
   return fetchJson<CategoryListResponse>("/categories");
 }
 
-export function getUpcoming(page = 1, pageSize = 20, category?: string) {
+export function getUpcoming(
+  page = 1,
+  pageSize = 20,
+  category?: string,
+  region?: string
+) {
   let url = `/upcoming?page=${page}&page_size=${pageSize}`;
   if (category) url += `&category=${encodeURIComponent(category)}`;
+  if (region) url += `&region=${encodeURIComponent(region)}`;
   return fetchJson<MatchListResponse>(url);
 }
 
@@ -126,11 +132,13 @@ export function getMatches(
   page = 1,
   pageSize = 20,
   status?: string,
-  category?: string
+  category?: string,
+  region?: string
 ) {
   let url = `/matches?page=${page}&page_size=${pageSize}`;
   if (status) url += `&status=${status}`;
   if (category) url += `&category=${encodeURIComponent(category)}`;
+  if (region) url += `&region=${encodeURIComponent(region)}`;
   return fetchJson<MatchListResponse>(url);
 }
 

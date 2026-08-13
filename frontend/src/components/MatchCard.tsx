@@ -64,7 +64,7 @@ export default function MatchCard({ match }: { match: MatchOut }) {
   const isScheduled = match.status === "scheduled";
   const cat = match.event_category ?? "";
 
-  const card = (
+  return (
     <div className="border border-border rounded-lg bg-card hover:bg-card-hover transition-colors p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between text-xs text-muted gap-2">
@@ -81,6 +81,29 @@ export default function MatchCard({ match }: { match: MatchOut }) {
           <span className="truncate">{match.event_name ?? ""}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {match.vlr_url && (
+            <a
+              href={match.vlr_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted hover:text-accent transition-colors"
+              title="View on vlr.gg"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-4.5-6H21m0 0v7.5m0-7.5l-9 9"
+                />
+              </svg>
+            </a>
+          )}
           {match.best_of && (
             <span className="px-1.5 py-0.5 rounded bg-border text-foreground/70">
               Bo{match.best_of}
@@ -142,19 +165,4 @@ export default function MatchCard({ match }: { match: MatchOut }) {
       )}
     </div>
   );
-
-  if (match.vlr_url) {
-    return (
-      <a
-        href={match.vlr_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block"
-      >
-        {card}
-      </a>
-    );
-  }
-
-  return card;
 }

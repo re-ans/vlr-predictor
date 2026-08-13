@@ -127,14 +127,22 @@ def _row_to_match(row, prediction=None) -> MatchOut:
     )
 
 
-def _apply_category_filter(q, count_q, category: str | None):
-    """Filter match queries by event category via JOIN."""
-    if not category:
+def _apply_event_filters(q, count_q, category: str | None, region: str | None):
+    """Filter match queries by event category/region via JOIN."""
+    if not category and not region:
         return q, count_q
-    q = q.where(Event.category == category)
-    count_q = count_q.join(Event, Match.event_id == Event.id).where(
-        Event.category == category
-    )
+    need_join = True
+    if category:
+        q = q.where(Event.category == category)
+    if region:
+        q = q.where(Event.region == region)
+    # count_q doesn't have Event joined yet
+    if need_join:
+        count_q = count_q.join(Event, Match.event_id == Event.id)
+    if category:
+        count_q = count_q.where(Event.category == category)
+    if region:
+        count_q = count_q.where(Event.region == region)
     return q, count_q
 
 
@@ -215,6 +223,7 @@ def predict(req: PredictionRequest):
 def list_matches(
     status: str | None = Query(None, description="Filter by status"),
     category: str | None = Query(None, description="Filter by league category"),
+    region: str | None = Query(None, description="Filter by event region"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -226,7 +235,7 @@ def list_matches(
             q = q.where(Match.status == status)
             count_q = count_q.where(Match.status == status)
 
-        q, count_q = _apply_category_filter(q, count_q, category)
+        q, count_q = _apply_event_filters(q, count_q, category, region)
 
         total = session.execute(count_q).scalar() or 0
         rows = session.execute(
@@ -404,6 +413,7 @@ def leaderboard(
 @app.get("/api/upcoming", response_model=MatchListResponse)
 def upcoming_with_predictions(
     category: str | None = Query(None, description="Filter by league category"),
+    region: str | None = Query(None, description="Filter by event region"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -420,11 +430,7 @@ def upcoming_with_predictions(
             .where(Match.status.in_(["scheduled", "running"]))
         )
 
-        if category:
-            q = q.where(Event.category == category)
-            count_q = count_q.join(Event, Match.event_id == Event.id).where(
-                Event.category == category
-            )
+        q, count_q = _apply_event_filters(q, count_q, category, region)
 
         total = session.execute(count_q).scalar() or 0
         rows = session.execute(
