@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f0f13;
+  --foreground: #e4e4e7;
+  --card: #18181b;
+  --card-hover: #1f1f23;
+  --border: #27272a;
+  --accent: #ff4655;
+  --accent-light: #ff6b77;
+  --accent-glow: rgba(255, 70, 85, 0.15);
+  --win: #22c55e;
+  --loss: #ef4444;
+  --muted: #71717a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-accent-glow: var(--accent-glow);
+  --color-win: var(--win);
+  --color-loss: var(--loss);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+}
+
+/* Probability bar animation */
+@keyframes fill-bar {
+  from { width: 0%; }
+}
+.prob-bar {
+  animation: fill-bar 0.6s ease-out;
+}

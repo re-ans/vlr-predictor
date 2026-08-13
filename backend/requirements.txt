@@ -1,0 +1,28 @@
+# Core runtime
+# NOTE: pinned for CPython 3.14 compatibility (prebuilt wheels, no Rust build).
+httpx==0.28.1
+pydantic==2.12.5
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+tenacity==9.0.0
+
+# API
+fastapi>=0.115
+uvicorn>=0.30
+
+# Database / migrations
+SQLAlchemy==2.0.52
+alembic==1.14.0
+psycopg[binary]==3.3.4
+
+# ML / features
+pandas>=2.2
+scikit-learn>=1.5
+lightgbm>=4.3
+xgboost>=2.1
+joblib>=1.4
+numpy>=1.26
+
+# Test
+pytest==8.3.3
+respx==0.22.0
