@@ -193,7 +193,12 @@ function FeatureComparison({
 }) {
   return (
     <div className="border border-border rounded-xl overflow-hidden">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm table-fixed">
+        <colgroup>
+          <col className="w-[30%]" />
+          <col className="w-[40%]" />
+          <col className="w-[30%]" />
+        </colgroup>
         <thead>
           <tr className="bg-card border-b border-border text-xs text-muted uppercase tracking-wide">
             <th className="py-2.5 px-4 text-left">{teamAName}</th>

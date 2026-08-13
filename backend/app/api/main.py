@@ -34,14 +34,26 @@ _model: ModelBundle | None = None
 
 _VLR_MATCH = "https://www.vlr.gg/{vlr_id}"
 _VLR_TEAM = "https://www.vlr.gg/team/{vlr_id}"
+_VLR_SEARCH = "https://www.vlr.gg/search/?q={q}&type={type}"
 
 
-def _vlr_match_url(vlr_id: str | None) -> str | None:
-    return _VLR_MATCH.format(vlr_id=vlr_id) if vlr_id else None
+def _vlr_match_url(vlr_id: str | None, team_a: str | None = None, team_b: str | None = None) -> str | None:
+    if vlr_id:
+        return _VLR_MATCH.format(vlr_id=vlr_id)
+    # Fallback: search vlr.gg for the matchup
+    if team_a and team_b:
+        from urllib.parse import quote
+        return _VLR_SEARCH.format(q=quote(f"{team_a} vs {team_b}"), type="matches")
+    return None
 
 
-def _vlr_team_url(vlr_id: str | None) -> str | None:
-    return _VLR_TEAM.format(vlr_id=vlr_id) if vlr_id else None
+def _vlr_team_url(vlr_id: str | None, name: str | None = None) -> str | None:
+    if vlr_id:
+        return _VLR_TEAM.format(vlr_id=vlr_id)
+    if name:
+        from urllib.parse import quote
+        return _VLR_SEARCH.format(q=quote(name), type="teams")
+    return None
 
 
 @asynccontextmanager
@@ -126,9 +138,9 @@ def _row_to_match(row, prediction=None) -> MatchOut:
         score_a=m.score_a,
         score_b=m.score_b,
         enriched=m.enriched,
-        vlr_url=_vlr_match_url(m.vlr_id),
-        team_a_vlr_url=_vlr_team_url(row.ta_vlr),
-        team_b_vlr_url=_vlr_team_url(row.tb_vlr),
+        vlr_url=_vlr_match_url(m.vlr_id, row.ta_name, row.tb_name),
+        team_a_vlr_url=_vlr_team_url(row.ta_vlr, row.ta_name),
+        team_b_vlr_url=_vlr_team_url(row.tb_vlr, row.tb_name),
         prediction=prediction,
     )
 
@@ -324,7 +336,7 @@ def list_teams(
                 country=t.country,
                 image_url=t.image_url,
                 current_rating=float(t.current_rating),
-                vlr_url=_vlr_team_url(t.vlr_id),
+                vlr_url=_vlr_team_url(t.vlr_id, t.name),
             )
             for t in rows
         ]
@@ -346,7 +358,7 @@ def get_team(team_id: int):
             country=t.country,
             image_url=t.image_url,
             current_rating=float(t.current_rating),
-            vlr_url=_vlr_team_url(t.vlr_id),
+            vlr_url=_vlr_team_url(t.vlr_id, t.name),
         )
 
 
@@ -432,7 +444,7 @@ def leaderboard(
                 win_count=r.wins,
                 loss_count=r.losses,
                 win_rate=round(r.wins / total_matches, 4) if total_matches else 0.0,
-                vlr_url=_vlr_team_url(r.vlr_id),
+                vlr_url=_vlr_team_url(r.vlr_id, r.name),
             ))
 
     return LeaderboardResponse(entries=entries, total=len(entries))

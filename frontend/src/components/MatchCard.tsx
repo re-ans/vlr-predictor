@@ -42,23 +42,30 @@ function TeamName({
   isWinner: boolean;
   align: "left" | "right";
 }) {
-  const cls = `font-semibold truncate ${isWinner ? "text-win" : ""} ${
-    align === "right" ? "text-right" : "text-left"
+  const alignCls = align === "right" ? "text-right" : "text-left";
+  const textCls = `font-semibold block truncate ${
+    isWinner ? "text-win" : ""
   }`;
   if (vlrUrl) {
     return (
-      <a
-        href={vlrUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className={`${cls} hover:underline`}
-      >
-        {name ?? "TBD"}
-      </a>
+      <div className={alignCls}>
+        <a
+          href={vlrUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={`${textCls} hover:underline`}
+        >
+          {name ?? "TBD"}
+        </a>
+      </div>
     );
   }
-  return <p className={cls}>{name ?? "TBD"}</p>;
+  return (
+    <div className={alignCls}>
+      <p className={textCls}>{name ?? "TBD"}</p>
+    </div>
+  );
 }
 
 export default function MatchCard({ match }: { match: MatchOut }) {
@@ -131,8 +138,8 @@ export default function MatchCard({ match }: { match: MatchOut }) {
       </div>
 
       {/* Teams */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
           <TeamName
             name={match.team_a_name}
             vlrUrl={match.team_a_vlr_url}
@@ -140,7 +147,7 @@ export default function MatchCard({ match }: { match: MatchOut }) {
             align="left"
           />
         </div>
-        <div className="text-center shrink-0">
+        <div className="text-center shrink-0 px-1">
           {isFinished ? (
             <span className="font-mono font-bold text-lg">
               {match.score_a} &ndash; {match.score_b}
@@ -151,7 +158,7 @@ export default function MatchCard({ match }: { match: MatchOut }) {
             </span>
           )}
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <TeamName
             name={match.team_b_name}
             vlrUrl={match.team_b_vlr_url}
