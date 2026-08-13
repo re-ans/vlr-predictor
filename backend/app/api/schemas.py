@@ -36,6 +36,8 @@ class MatchOut(BaseModel):
     team_b_name: str | None = None
     team_a_id: int | None = None
     team_b_id: int | None = None
+    team_a_image: str | None = None
+    team_b_image: str | None = None
     winner_name: str | None = None
     winner_id: int | None = None
     match_date: datetime | None = None

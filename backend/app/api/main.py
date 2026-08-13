@@ -91,8 +91,12 @@ def _match_query():
             Event.category.label("event_category"),
             TeamA.name.label("ta_name"),
             TeamA.vlr_id.label("ta_vlr"),
+            TeamA.image_url.label("ta_image"),
+            TeamA.current_rating.label("ta_elo"),
             TeamB.name.label("tb_name"),
             TeamB.vlr_id.label("tb_vlr"),
+            TeamB.image_url.label("tb_image"),
+            TeamB.current_rating.label("tb_elo"),
             TeamW.name.label("tw_name"),
         )
         .outerjoin(Event, Match.event_id == Event.id)
@@ -112,6 +116,8 @@ def _row_to_match(row, prediction=None) -> MatchOut:
         team_b_name=row.tb_name,
         team_a_id=m.team_a_id,
         team_b_id=m.team_b_id,
+        team_a_image=row.ta_image,
+        team_b_image=row.tb_image,
         winner_name=row.tw_name,
         winner_id=m.winner_id,
         match_date=m.match_date,
@@ -257,7 +263,33 @@ def get_match(match_id: int):
         ).first()
         if row is None:
             raise HTTPException(404, f"Match {match_id} not found")
-        return _row_to_match(row)
+
+        m = row[0]
+        prediction = None
+        if _model and m.team_a_id and m.team_b_id:
+            try:
+                features = compute_live_features(
+                    m.team_a_id, m.team_b_id, m.best_of or 3
+                )
+                pred = _model.predict(features)
+                prediction = PredictionResponse(
+                    team_a_id=m.team_a_id,
+                    team_b_id=m.team_b_id,
+                    team_a_name=row.ta_name or "",
+                    team_b_name=row.tb_name or "",
+                    team_a_win_prob=pred.team_a_win_prob,
+                    team_b_win_prob=pred.team_b_win_prob,
+                    predicted_winner=(
+                        (row.ta_name or "") if pred.predicted_winner == "team_a"
+                        else (row.tb_name or "")
+                    ),
+                    confidence=pred.confidence,
+                    features=features,
+                )
+            except Exception as exc:
+                logger.debug("Prediction failed for match %d: %s", m.id, exc)
+
+        return _row_to_match(row, prediction)
 
 
 # ---------------------------------------------------------------------------

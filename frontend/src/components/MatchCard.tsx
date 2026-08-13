@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { MatchOut } from "@/lib/api";
 import ProbBar from "./ProbBar";
 
@@ -50,6 +51,7 @@ function TeamName({
         href={vlrUrl}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
         className={`${cls} hover:underline`}
       >
         {name ?? "TBD"}
@@ -60,12 +62,16 @@ function TeamName({
 }
 
 export default function MatchCard({ match }: { match: MatchOut }) {
+  const router = useRouter();
   const isFinished = match.status === "finished";
   const isScheduled = match.status === "scheduled";
   const cat = match.event_category ?? "";
 
   return (
-    <div className="border border-border rounded-lg bg-card hover:bg-card-hover transition-colors p-4 space-y-3">
+    <div
+      onClick={() => router.push(`/matches/${match.id}`)}
+      className="border border-border rounded-lg bg-card hover:bg-card-hover transition-colors p-4 space-y-3 cursor-pointer"
+    >
       {/* Header */}
       <div className="flex items-center justify-between text-xs text-muted gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -86,6 +92,7 @@ export default function MatchCard({ match }: { match: MatchOut }) {
               href={match.vlr_url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               className="text-muted hover:text-accent transition-colors"
               title="View on vlr.gg"
             >

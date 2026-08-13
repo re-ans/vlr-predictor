@@ -34,6 +34,8 @@ export interface MatchOut {
   team_b_name: string | null;
   team_a_id: number | null;
   team_b_id: number | null;
+  team_a_image: string | null;
+  team_b_image: string | null;
   winner_name: string | null;
   winner_id: number | null;
   match_date: string | null;
@@ -151,6 +153,10 @@ export function getLeaderboard(
   if (category) url += `&category=${encodeURIComponent(category)}`;
   if (region) url += `&region=${encodeURIComponent(region)}`;
   return fetchJson<LeaderboardResponse>(url);
+}
+
+export function getMatch(matchId: number) {
+  return fetchJson<MatchOut>(`/matches/${matchId}`);
 }
 
 export function getTeams(search?: string, page = 1, pageSize = 50) {
