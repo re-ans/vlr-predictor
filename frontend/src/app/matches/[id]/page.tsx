@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { getMatch, type MatchOut } from "@/lib/api";
+import {
+  getMatch,
+  saveMatch,
+  unsaveMatch,
+  listSavedMatches,
+  savePrediction,
+  type MatchOut,
+} from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import ProbBar from "@/components/ProbBar";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -279,9 +287,13 @@ function FeatureComparison({
 
 export default function MatchDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const { token } = useAuth();
   const [match, setMatch] = useState<MatchOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const [predSaved, setPredSaved] = useState(false);
 
   useEffect(() => {
     if (!params.id) return;
@@ -291,6 +303,44 @@ export default function MatchDetailPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [params.id]);
+
+  useEffect(() => {
+    if (token && params.id) {
+      listSavedMatches(token).then((r) => {
+        setIsSaved(r.match_ids.includes(Number(params.id)));
+      }).catch(() => {});
+    }
+  }, [token, params.id]);
+
+  async function handleBookmark() {
+    if (!token) { router.push("/login"); return; }
+    const mid = Number(params.id);
+    if (isSaved) {
+      await unsaveMatch(token, mid);
+      setIsSaved(false);
+    } else {
+      await saveMatch(token, mid);
+      setIsSaved(true);
+    }
+  }
+
+  async function handleSavePrediction() {
+    if (!token) { router.push("/login"); return; }
+    if (!match?.prediction) return;
+    const p = match.prediction;
+    await savePrediction(token, {
+      match_id: match.id,
+      team_a_id: p.team_a_id,
+      team_b_id: p.team_b_id,
+      team_a_name: p.team_a_name,
+      team_b_name: p.team_b_name,
+      prob_a: p.team_a_win_prob,
+      prob_b: p.team_b_win_prob,
+      predicted_winner: p.predicted_winner,
+      best_of: match.best_of,
+    });
+    setPredSaved(true);
+  }
 
   if (loading) {
     return (
@@ -356,6 +406,27 @@ export default function MatchDetailPage() {
         >
           {match.status}
         </span>
+        <button
+          onClick={handleBookmark}
+          className={`ml-auto transition-colors ${
+            isSaved ? "text-accent" : "text-muted hover:text-accent"
+          }`}
+          title={isSaved ? "Unsave match" : "Save match"}
+        >
+          <svg
+            className="w-5 h-5"
+            fill={isSaved ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
+            />
+          </svg>
+        </button>
       </div>
 
       {/* Match date */}
@@ -473,6 +544,13 @@ export default function MatchDetailPage() {
               <p className="text-sm text-muted mt-1">
                 {(pred.confidence * 100).toFixed(1)}% confidence
               </p>
+              <button
+                onClick={handleSavePrediction}
+                disabled={predSaved}
+                className="mt-3 px-4 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 bg-accent/10 text-accent hover:bg-accent/20"
+              >
+                {predSaved ? "Prediction Saved" : "Save Prediction"}
+              </button>
             </div>
           </div>
 

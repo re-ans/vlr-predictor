@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import type { MatchOut } from "@/lib/api";
+import { saveMatch, unsaveMatch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import ProbBar from "./ProbBar";
 
 function formatDate(iso: string | null) {
@@ -68,11 +70,37 @@ function TeamName({
   );
 }
 
-export default function MatchCard({ match }: { match: MatchOut }) {
+export default function MatchCard({
+  match,
+  isSaved,
+  onToggleSave,
+}: {
+  match: MatchOut;
+  isSaved?: boolean;
+  onToggleSave?: (matchId: number, saved: boolean) => void;
+}) {
   const router = useRouter();
+  const { token } = useAuth();
   const isFinished = match.status === "finished";
   const isScheduled = match.status === "scheduled";
   const cat = match.event_category ?? "";
+
+  async function handleBookmark(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+    try {
+      if (isSaved) {
+        await unsaveMatch(token, match.id);
+        onToggleSave?.(match.id, false);
+      } else {
+        await saveMatch(token, match.id);
+        onToggleSave?.(match.id, true);
+      }
+    } catch {}
+  }
 
   return (
     <div
@@ -94,6 +122,29 @@ export default function MatchCard({ match }: { match: MatchOut }) {
           <span className="truncate">{match.event_name ?? ""}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleBookmark}
+            className={`transition-colors ${
+              isSaved
+                ? "text-accent"
+                : "text-muted hover:text-accent"
+            }`}
+            title={isSaved ? "Unsave match" : "Save match"}
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              fill={isSaved ? "currentColor" : "none"}
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
+              />
+            </svg>
+          </button>
           {match.vlr_url && (
             <a
               href={match.vlr_url}

@@ -1,21 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getMatches, refreshMatches, type MatchListResponse } from "@/lib/api";
+import {
+  getMatches,
+  refreshMatches,
+  listSavedMatches,
+  type MatchListResponse,
+} from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import MatchCard from "@/components/MatchCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import RegionFilter from "@/components/RegionFilter";
 
 export default function MatchesPage() {
+  const { token } = useAuth();
   const [data, setData] = useState<MatchListResponse | null>(null);
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState("");
   const [region, setRegion] = useState("");
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const didSync = useRef(false);
 
-  // Sync results from PandaScore once on mount
   useEffect(() => {
     if (!didSync.current) {
       didSync.current = true;
@@ -25,6 +32,14 @@ export default function MatchesPage() {
         .finally(() => setSyncing(false));
     }
   }, []);
+
+  useEffect(() => {
+    if (token) {
+      listSavedMatches(token)
+        .then((r) => setSavedIds(new Set(r.match_ids)))
+        .catch(() => {});
+    }
+  }, [token]);
 
   useEffect(() => {
     setLoading(true);
@@ -37,10 +52,18 @@ export default function MatchesPage() {
     return () => clearTimeout(timer);
   }, [page, category, region, syncing]);
 
-  // Reset page when filters change
   useEffect(() => {
     setPage(1);
   }, [category, region]);
+
+  function handleToggleSave(matchId: number, saved: boolean) {
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (saved) next.add(matchId);
+      else next.delete(matchId);
+      return next;
+    });
+  }
 
   const totalPages = data ? Math.ceil(data.total / data.page_size) : 0;
 
@@ -81,7 +104,12 @@ export default function MatchesPage() {
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {data.matches.map((m) => (
-                <MatchCard key={m.id} match={m} />
+                <MatchCard
+                  key={m.id}
+                  match={m}
+                  isSaved={savedIds.has(m.id)}
+                  onToggleSave={handleToggleSave}
+                />
               ))}
             </div>
           )}

@@ -1,35 +1,51 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getUpcoming, refreshMatches, type MatchListResponse } from "@/lib/api";
+import {
+  getUpcoming,
+  refreshMatches,
+  listSavedMatches,
+  type MatchListResponse,
+} from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import MatchCard from "@/components/MatchCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import RegionFilter from "@/components/RegionFilter";
 
 export default function HomePage() {
+  const { token } = useAuth();
   const [data, setData] = useState<MatchListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [category, setCategory] = useState("");
   const [region, setRegion] = useState("");
+  const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const didSync = useRef(false);
 
-  // Sync results from PandaScore once on mount, then fetch
+  // Sync results from PandaScore once on mount
   useEffect(() => {
     if (!didSync.current) {
       didSync.current = true;
       setSyncing(true);
       refreshMatches()
-        .catch(() => {}) // best-effort
+        .catch(() => {})
         .finally(() => setSyncing(false));
     }
   }, []);
 
+  // Load saved match IDs for logged-in user
+  useEffect(() => {
+    if (token) {
+      listSavedMatches(token)
+        .then((r) => setSavedIds(new Set(r.match_ids)))
+        .catch(() => {});
+    }
+  }, [token]);
+
   useEffect(() => {
     setLoading(true);
     setError(null);
-    // Small delay on first load to let sync finish if it's quick
     const delay = syncing ? 1500 : 0;
     const timer = setTimeout(() => {
       getUpcoming(1, 50, category || undefined, region || undefined)
@@ -39,6 +55,15 @@ export default function HomePage() {
     }, delay);
     return () => clearTimeout(timer);
   }, [category, region, syncing]);
+
+  function handleToggleSave(matchId: number, saved: boolean) {
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (saved) next.add(matchId);
+      else next.delete(matchId);
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -83,7 +108,12 @@ export default function HomePage() {
       {data && data.matches.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2">
           {data.matches.map((m) => (
-            <MatchCard key={m.id} match={m} />
+            <MatchCard
+              key={m.id}
+              match={m}
+              isSaved={savedIds.has(m.id)}
+              onToggleSave={handleToggleSave}
+            />
           ))}
         </div>
       )}

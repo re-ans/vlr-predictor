@@ -108,3 +108,68 @@ class HealthResponse(BaseModel):
 
 class CategoryListResponse(BaseModel):
     categories: list[dict[str, str]]
+
+
+# -- Auth --
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    display_name: str | None = None
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class AuthResponse(BaseModel):
+    token: str
+    user: "UserOut"
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    display_name: str | None = None
+
+
+# -- Profile / saved items --
+
+class SavedPredictionOut(BaseModel):
+    id: int
+    match_id: int | None = None
+    team_a_id: int | None = None
+    team_b_id: int | None = None
+    team_a_name: str
+    team_b_name: str
+    prob_a: float
+    prob_b: float
+    predicted_winner: str
+    best_of: int | None = None
+    created_at: datetime | None = None
+
+class SavePredictionRequest(BaseModel):
+    match_id: int | None = None
+    team_a_id: int
+    team_b_id: int
+    team_a_name: str
+    team_b_name: str
+    prob_a: float
+    prob_b: float
+    predicted_winner: str
+    best_of: int | None = None
+
+class RosterOut(BaseModel):
+    id: int
+    name: str
+    player_ids: list[int] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+class CreateRosterRequest(BaseModel):
+    name: str
+    player_ids: list[int] = Field(default_factory=list)
+
+class PlayerOut(BaseModel):
+    id: int
+    name: str
+    team_id: int | None = None
+    team_name: str | None = None
+    country: str | None = None

@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
 
+    # Auth
+    jwt_secret: str = Field(default="dev-insecure-change-me", alias="JWT_SECRET")
+    jwt_expire_minutes: int = Field(default=60 * 24 * 7, alias="JWT_EXPIRE_MINUTES")
+
     # Scope
     ingest_regions: str = Field(default="", alias="INGEST_REGIONS")
 

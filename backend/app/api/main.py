@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from ..features.model import ModelBundle, load_model
 from ..ingest.leagues import CATEGORY_LABELS
 from .predict import compute_live_features, warm_cache
+from .profile import router as profile_router
 from .schemas import (
     CategoryListResponse,
     HealthResponse,
@@ -78,6 +79,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.include_router(profile_router)
 
 app.add_middleware(
     CORSMiddleware,

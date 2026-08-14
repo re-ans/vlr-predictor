@@ -223,6 +223,135 @@ class RankingsSnapshot(TimestampMixin, Base):
     )
 
 
+class User(TimestampMixin, Base):
+    """A registered user (email + password auth)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(64))
+
+    favorite_teams: Mapped[list["FavoriteTeam"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    saved_matches: Mapped[list["SavedMatch"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    saved_predictions: Mapped[list["SavedPrediction"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    rosters: Mapped[list["CustomRoster"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class FavoriteTeam(TimestampMixin, Base):
+    __tablename__ = "favorite_teams"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id: Mapped[int] = mapped_column(
+        ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    user: Mapped["User"] = relationship(back_populates="favorite_teams")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "team_id", name="uq_favorite_teams_user_team"),
+    )
+
+
+class SavedMatch(TimestampMixin, Base):
+    __tablename__ = "saved_matches"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    match_id: Mapped[int] = mapped_column(
+        ForeignKey("matches.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    user: Mapped["User"] = relationship(back_populates="saved_matches")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "match_id", name="uq_saved_matches_user_match"),
+    )
+
+
+class SavedPrediction(TimestampMixin, Base):
+    """A point-in-time snapshot of the model's prediction for a matchup."""
+
+    __tablename__ = "saved_predictions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Optional link to a real scheduled/finished match (for correctness tracking).
+    match_id: Mapped[int | None] = mapped_column(
+        ForeignKey("matches.id", ondelete="SET NULL"), index=True
+    )
+    team_a_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="SET NULL")
+    )
+    team_b_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="SET NULL")
+    )
+    team_a_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    team_b_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    prob_a: Mapped[float] = mapped_column(Numeric(6, 4), nullable=False)
+    prob_b: Mapped[float] = mapped_column(Numeric(6, 4), nullable=False)
+    predicted_winner: Mapped[str] = mapped_column(String(255), nullable=False)
+    best_of: Mapped[int | None] = mapped_column(Integer)
+
+    user: Mapped["User"] = relationship(back_populates="saved_predictions")
+
+
+class CustomRoster(TimestampMixin, Base):
+    """A user-defined named lineup of players (groundwork for a future
+    roster-aware prediction model — does not drive predictions yet)."""
+
+    __tablename__ = "custom_rosters"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="rosters")
+    players: Mapped[list["CustomRosterPlayer"]] = relationship(
+        back_populates="roster", cascade="all, delete-orphan"
+    )
+
+
+class CustomRosterPlayer(TimestampMixin, Base):
+    __tablename__ = "custom_roster_players"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    roster_id: Mapped[int] = mapped_column(
+        ForeignKey("custom_rosters.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    player_id: Mapped[int] = mapped_column(
+        ForeignKey("players.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    roster: Mapped["CustomRoster"] = relationship(back_populates="players")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "roster_id", "player_id", name="uq_custom_roster_players_roster_player"
+        ),
+    )
+
+
 class IngestionRun(TimestampMixin, Base):
     """Audit log for every ingestion run (both PandaScore and vlrggapi paths)."""
 
