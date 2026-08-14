@@ -14,6 +14,7 @@ from sqlalchemy.orm import aliased
 
 from ..db.base import session_scope
 from ..db.models import Event, Match, Team
+from datetime import datetime, timedelta, timezone
 from ..features.model import ModelBundle, load_model
 from ..ingest.leagues import CATEGORY_LABELS
 from .predict import compute_live_features, warm_cache
@@ -217,6 +218,10 @@ def refresh_matches():
         _last_sync = time.time()
         from ..ingest.pandascore_ingest import sync
         stats = sync(max_pages=2)
+
+        # Clean up stale scheduled matches PandaScore still reports as not_started
+        _expire_stale_scheduled()
+
         # Rebuild the Elo/stats cache so predictions reflect new results
         warm_cache()
         return {
@@ -229,6 +234,35 @@ def refresh_matches():
         return {"synced": False, "message": str(exc)}
     finally:
         _sync_lock.release()
+
+
+def _expire_stale_scheduled(hours: int = 6) -> int:
+    """Mark scheduled matches whose start time passed more than ``hours`` ago
+    as finished/canceled so they don't keep showing as upcoming.
+
+    If scores/winner are present, treat as finished. If still 0-0 and no winner,
+    mark as canceled since PandaScore never reported a result.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    with session_scope() as session:
+        stale = session.execute(
+            select(Match).where(
+                Match.status == "scheduled", Match.match_date < cutoff
+            )
+        ).scalars().all()
+        updated = 0
+        for m in stale:
+            if m.score_a is not None and m.score_b is not None and (
+                m.score_a > 1 or m.score_b > 1 or m.winner_id is not None
+            ):
+                m.status = "finished"
+            else:
+                m.status = "canceled"
+            updated += 1
+        session.commit()
+        if updated:
+            logger.info("Expired %s stale scheduled matches", updated)
+        return updated
 
 
 # ---------------------------------------------------------------------------
