@@ -159,6 +159,13 @@ export function getMatch(matchId: number) {
   return fetchJson<MatchOut>(`/matches/${matchId}`);
 }
 
+export function refreshMatches() {
+  return fetchJson<{ synced: boolean; rows_updated?: number; message?: string }>(
+    "/refresh",
+    { method: "POST" }
+  );
+}
+
 export function getTeams(search?: string, page = 1, pageSize = 50) {
   let url = `/teams?page=${page}&page_size=${pageSize}`;
   if (search) url += `&search=${encodeURIComponent(search)}`;

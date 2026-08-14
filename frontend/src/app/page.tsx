@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getUpcoming, type MatchListResponse } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { getUpcoming, refreshMatches, type MatchListResponse } from "@/lib/api";
 import MatchCard from "@/components/MatchCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import RegionFilter from "@/components/RegionFilter";
@@ -10,25 +10,51 @@ export default function HomePage() {
   const [data, setData] = useState<MatchListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [category, setCategory] = useState("");
   const [region, setRegion] = useState("");
+  const didSync = useRef(false);
+
+  // Sync results from PandaScore once on mount, then fetch
+  useEffect(() => {
+    if (!didSync.current) {
+      didSync.current = true;
+      setSyncing(true);
+      refreshMatches()
+        .catch(() => {}) // best-effort
+        .finally(() => setSyncing(false));
+    }
+  }, []);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    getUpcoming(1, 50, category || undefined, region || undefined)
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [category, region]);
+    // Small delay on first load to let sync finish if it's quick
+    const delay = syncing ? 1500 : 0;
+    const timer = setTimeout(() => {
+      getUpcoming(1, 50, category || undefined, region || undefined)
+        .then(setData)
+        .catch((e) => setError(e.message))
+        .finally(() => setLoading(false));
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [category, region, syncing]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Upcoming Matches</h1>
-        <p className="text-muted text-sm mt-1">
-          Live predictions for scheduled Valorant matches
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Upcoming Matches</h1>
+          <p className="text-muted text-sm mt-1">
+            Live predictions for scheduled Valorant matches
+          </p>
+        </div>
+        {syncing && (
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <div className="h-3 w-3 border border-accent border-t-transparent rounded-full animate-spin" />
+            Syncing results...
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">

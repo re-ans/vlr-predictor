@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import time
+import threading
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -183,6 +185,50 @@ def health():
         match_count=match_count,
         team_count=team_count,
     )
+
+
+# ---------------------------------------------------------------------------
+# Refresh (sync latest results from PandaScore)
+# ---------------------------------------------------------------------------
+
+_SYNC_COOLDOWN = 120  # seconds between syncs
+_last_sync: float = 0.0
+_sync_lock = threading.Lock()
+
+
+@app.post("/api/refresh")
+def refresh_matches():
+    """Sync upcoming/running/recently-finished matches from PandaScore.
+
+    Rate-limited to at most once every 2 minutes to avoid hammering the API.
+    Returns immediately if a sync is already in progress or was done recently.
+    """
+    global _last_sync
+
+    now = time.time()
+    if now - _last_sync < _SYNC_COOLDOWN:
+        remaining = int(_SYNC_COOLDOWN - (now - _last_sync))
+        return {"synced": False, "message": f"Cooldown: retry in {remaining}s"}
+
+    if not _sync_lock.acquire(blocking=False):
+        return {"synced": False, "message": "Sync already in progress"}
+
+    try:
+        _last_sync = time.time()
+        from ..ingest.pandascore_ingest import sync
+        stats = sync(max_pages=2)
+        # Rebuild the Elo/stats cache so predictions reflect new results
+        warm_cache()
+        return {
+            "synced": True,
+            "rows_updated": stats.rows_written,
+            "errors": stats.errors,
+        }
+    except Exception as exc:
+        logger.error("Refresh failed: %s", exc)
+        return {"synced": False, "message": str(exc)}
+    finally:
+        _sync_lock.release()
 
 
 # ---------------------------------------------------------------------------

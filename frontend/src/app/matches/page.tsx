@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getMatches, type MatchListResponse } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { getMatches, refreshMatches, type MatchListResponse } from "@/lib/api";
 import MatchCard from "@/components/MatchCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import RegionFilter from "@/components/RegionFilter";
@@ -12,13 +12,30 @@ export default function MatchesPage() {
   const [category, setCategory] = useState("");
   const [region, setRegion] = useState("");
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const didSync = useRef(false);
+
+  // Sync results from PandaScore once on mount
+  useEffect(() => {
+    if (!didSync.current) {
+      didSync.current = true;
+      setSyncing(true);
+      refreshMatches()
+        .catch(() => {})
+        .finally(() => setSyncing(false));
+    }
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-    getMatches(page, 20, "finished", category || undefined, region || undefined)
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [page, category, region]);
+    const delay = syncing ? 1500 : 0;
+    const timer = setTimeout(() => {
+      getMatches(page, 20, "finished", category || undefined, region || undefined)
+        .then(setData)
+        .finally(() => setLoading(false));
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [page, category, region, syncing]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -29,11 +46,19 @@ export default function MatchesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Match Results</h1>
-        <p className="text-muted text-sm mt-1">
-          {data ? `${data.total} finished matches` : "Loading..."}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Match Results</h1>
+          <p className="text-muted text-sm mt-1">
+            {data ? `${data.total} finished matches` : "Loading..."}
+          </p>
+        </div>
+        {syncing && (
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <div className="h-3 w-3 border border-accent border-t-transparent rounded-full animate-spin" />
+            Syncing results...
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
