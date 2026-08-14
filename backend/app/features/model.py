@@ -259,10 +259,26 @@ def _persist_elo_ratings() -> None:
     if not ratings:
         return
 
-    with session_scope() as session:
-        for team_id, rating in ratings.items():
-            session.execute(
-                sa_text("UPDATE teams SET current_rating = :r WHERE id = :tid"),
-                {"r": round(rating, 2), "tid": team_id},
-            )
-    logger.info("Persisted Elo ratings for %d teams", len(ratings))
+    # Sort by team_id so all writers acquire row locks in the same order,
+    # which prevents deadlocks against concurrent writers (e.g. ingestion).
+    updates = sorted(ratings.items())
+
+    import time as _time
+    from sqlalchemy.exc import OperationalError
+
+    for attempt in range(1, 4):
+        try:
+            with session_scope() as session:
+                for team_id, rating in updates:
+                    session.execute(
+                        sa_text("UPDATE teams SET current_rating = :r WHERE id = :tid"),
+                        {"r": round(rating, 2), "tid": team_id},
+                    )
+            logger.info("Persisted Elo ratings for %d teams", len(ratings))
+            return
+        except OperationalError as exc:
+            if "deadlock" in str(exc).lower() and attempt < 3:
+                logger.warning("Elo persist deadlock (attempt %d), retrying...", attempt)
+                _time.sleep(0.5 * attempt)
+                continue
+            raise
