@@ -170,9 +170,15 @@ function formatDate(iso: string | null) {
 }
 
 // Grouped comparison rows for the feature table
-const COMPARISON_ROWS = [
+type RowKind = "count" | "pct" | "num";
+const COMPARISON_ROWS: { label: string; a: string; b: string; kind?: RowKind }[] = [
   { label: "Elo Rating", a: "elo_a", b: "elo_b" },
   { label: "Elo Win Expectancy", a: "elo_expected_a", b: "elo_expected_b" },
+  { label: "VCT (T1) Matches", a: "t1_exp_a", b: "t1_exp_b", kind: "count" },
+  { label: "VCT (T1) Win Rate", a: "t1_wr_a", b: "t1_wr_b", kind: "pct" },
+  { label: "Challengers (T2) Matches", a: "t2_exp_a", b: "t2_exp_b", kind: "count" },
+  { label: "Challengers (T2) Win Rate", a: "t2_wr_a", b: "t2_wr_b", kind: "pct" },
+  { label: "Peak Tier", a: "peak_tier_a", b: "peak_tier_b", kind: "count" },
   { label: "Last 3 Form", a: "form_a_3", b: "form_b_3" },
   { label: "Last 5 Form", a: "form_a_5", b: "form_b_5" },
   { label: "Last 10 Form", a: "form_a_10", b: "form_b_10" },
@@ -211,8 +217,14 @@ function FeatureComparison({
             const valA = features[row.a];
             const valB = features[row.b];
             if (valA === undefined || valB === undefined) return null;
-            const fmtA = FEATURE_EXPLAIN[row.a]?.format(valA) ?? valA.toFixed(2);
-            const fmtB = FEATURE_EXPLAIN[row.b]?.format(valB) ?? valB.toFixed(2);
+
+            const fmt = (v: number) => {
+              if (row.kind === "pct") return (v * 100).toFixed(0) + "%";
+              if (row.kind === "count") return v.toString();
+              return FEATURE_EXPLAIN[row.a]?.format(v) ?? v.toFixed(2);
+            };
+            const fmtA = fmt(valA);
+            const fmtB = fmt(valB);
 
             // Determine which side is "better" for color hints
             let aWins = false;

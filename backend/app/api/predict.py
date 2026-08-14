@@ -16,6 +16,7 @@ from sqlalchemy import select, text as sa_text
 
 from ..db.base import build_engine
 from ..features.elo import EloEngine
+from ..features.builder import tier_bucket
 
 logger = logging.getLogger("api.predict")
 
@@ -25,12 +26,16 @@ _CACHE_TTL = 300  # 5 minutes
 
 
 class _TeamStats:
-    __slots__ = ("results", "last_played", "score_diffs")
+    __slots__ = ("results", "last_played", "score_diffs", "tier_record", "peak_tier")
 
     def __init__(self) -> None:
         self.results: list[int] = []
         self.last_played: datetime | None = None
         self.score_diffs: list[float] = []
+        self.tier_record: dict[str, list[int]] = {
+            "t1": [0, 0], "t2": [0, 0], "t3": [0, 0]
+        }
+        self.peak_tier: int = 0
 
     def form(self, n: int) -> float:
         recent = self.results[-n:]
@@ -39,6 +44,20 @@ class _TeamStats:
     def avg_score_diff(self) -> float:
         tail = self.score_diffs[-20:]
         return sum(tail) / len(tail) if tail else 0.0
+
+    def record_tier(self, tier: str | None, won: bool) -> None:
+        rec = self.tier_record[tier_bucket(tier)]
+        rec[1] += 1
+        if won:
+            rec[0] += 1
+        self.peak_tier = max(self.peak_tier, _TIER_ORD.get((tier or "").lower(), 0))
+
+    def tier_exp(self, bucket: str) -> int:
+        return self.tier_record[bucket][1]
+
+    def tier_winrate(self, bucket: str) -> float:
+        wins, played = self.tier_record[bucket]
+        return wins / played if played else 0.0
 
 
 class StatsCache:
@@ -89,6 +108,7 @@ class StatsCache:
                 if s_a is not None and s_b is not None:
                     diff = float(s_a - s_b) if is_a else float(s_b - s_a)
                     ts.score_diffs.append(diff)
+                ts.record_tier(tier, won)
 
             key = frozenset([m_a, m_b])
             self.h2h[key][w_id] += 1
@@ -141,6 +161,16 @@ def compute_live_features(
     h2h_key = frozenset([team_a_id, team_b_id])
     h2h = _cache.h2h.get(h2h_key, {})
 
+    tier_feats: dict[str, Any] = {}
+    for bucket in ("t1", "t2"):
+        tier_feats[f"{bucket}_exp_a"] = sa.tier_exp(bucket)
+        tier_feats[f"{bucket}_exp_b"] = sb.tier_exp(bucket)
+        tier_feats[f"{bucket}_wr_a"] = sa.tier_winrate(bucket)
+        tier_feats[f"{bucket}_wr_b"] = sb.tier_winrate(bucket)
+    tier_feats["peak_tier_a"] = sa.peak_tier
+    tier_feats["peak_tier_b"] = sb.peak_tier
+    tier_feats["peak_tier_diff"] = sa.peak_tier - sb.peak_tier
+
     return {
         "elo_a": elo_a,
         "elo_b": elo_b,
@@ -157,4 +187,5 @@ def compute_live_features(
         "score_diff_avg_a": sa.avg_score_diff(),
         "score_diff_avg_b": sb.avg_score_diff(),
         **form_feats,
+        **tier_feats,
     }

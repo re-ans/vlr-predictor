@@ -115,11 +115,23 @@ def train_and_evaluate(
     min_matches_per_team: int = 2,
     test_fraction: float = 0.2,
     calibrate: bool = True,
+    n_estimators: int = 500,
+    max_depth: int = 4,
+    learning_rate: float = 0.03,
+    num_leaves: int = 16,
+    min_child_samples: int = 30,
+    reg_alpha: float = 0.5,
+    reg_lambda: float = 2.0,
+    subsample: float = 0.7,
+    colsample_bytree: float = 0.7,
 ) -> TrainResult:
     """Train a LightGBM model with chronological split and evaluate it.
 
     The data is split chronologically: the most recent ``test_fraction`` of
     matches form the test set, ensuring we never train on future data.
+
+    All LightGBM hyperparameters are exposed so the model can be tuned from
+    the CLI without editing code.
     """
     df = build_feature_df(min_matches_per_team=min_matches_per_team)
     if len(df) < 50:
@@ -141,15 +153,15 @@ def train_and_evaluate(
 
     # LightGBM with early stopping to prevent overfitting
     model = lgb.LGBMClassifier(
-        n_estimators=500,
-        max_depth=4,
-        learning_rate=0.03,
-        num_leaves=16,
-        subsample=0.7,
-        colsample_bytree=0.7,
-        min_child_samples=30,
-        reg_alpha=0.5,
-        reg_lambda=2.0,
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        learning_rate=learning_rate,
+        num_leaves=num_leaves,
+        subsample=subsample,
+        colsample_bytree=colsample_bytree,
+        min_child_samples=min_child_samples,
+        reg_alpha=reg_alpha,
+        reg_lambda=reg_lambda,
         random_state=42,
         verbosity=-1,
     )

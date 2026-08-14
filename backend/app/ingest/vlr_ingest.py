@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, aliased
 
 from ..clients import VlrggApiClient, VlrggApiError
@@ -205,15 +206,24 @@ def backfill(
                                 )
                                 if not detail_segs:
                                     continue
-                                n = enrich_match(
-                                    session, db_id, detail_segs[0],
-                                    str(vm.get("match_id")), player_cache,
-                                )
+                                # Per-match savepoint: a DB error (e.g. a vlr_id
+                                # collision) rolls back just this match, not the
+                                # whole event, so the backfill keeps going.
+                                with session.begin_nested():
+                                    n = enrich_match(
+                                        session, db_id, detail_segs[0],
+                                        str(vm.get("match_id")), player_cache,
+                                    )
                                 if n:
                                     matched += 1
                                     stats.add_rows(1)
                             except VlrggApiError as exc:
                                 stats.add_error(f"detail {vm.get('match_id')}: {exc}")
+                            except SQLAlchemyError as exc:
+                                stats.add_error(
+                                    f"enrich {vm.get('match_id')} -> match {db_id}: "
+                                    f"{type(exc).__name__}"
+                                )
                             if request_delay:
                                 time.sleep(request_delay)
                 if max_events is not None and events_seen >= max_events:

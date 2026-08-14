@@ -33,6 +33,21 @@ logger = logging.getLogger("features.builder")
 _FORM_WINDOWS = [3, 5, 10, 20]
 _TIER_ORD: dict[str, int] = {"s": 5, "a": 4, "b": 3, "c": 2, "d": 1, "unranked": 0}
 
+
+def tier_bucket(tier: str | None) -> str:
+    """Collapse PandaScore tier codes into coarse competitive levels.
+
+    t1 = VCT International / franchised leagues (s, a)
+    t2 = Challengers / regional (b, c)
+    t3 = community / unranked (d, everything else)
+    """
+    t = (tier or "").lower()
+    if t in ("s", "a"):
+        return "t1"
+    if t in ("b", "c"):
+        return "t2"
+    return "t3"
+
 _MATCHES_QUERY = text("""
     SELECT
         m.id,
@@ -63,13 +78,30 @@ class _TeamHistory:
     results: deque[int] = field(default_factory=lambda: deque(maxlen=50))
     last_played: datetime | None = None
     score_diffs: deque[float] = field(default_factory=lambda: deque(maxlen=20))
+    # Cumulative per-tier record: bucket -> [wins, matches]
+    tier_record: dict[str, list[int]] = field(
+        default_factory=lambda: {"t1": [0, 0], "t2": [0, 0], "t3": [0, 0]}
+    )
+    peak_tier: int = 0
 
-    def add(self, won: bool, match_date: datetime | None, score_diff: float | None) -> None:
+    def add(
+        self,
+        won: bool,
+        match_date: datetime | None,
+        score_diff: float | None,
+        tier: str | None,
+    ) -> None:
         self.results.append(1 if won else 0)
         if match_date:
             self.last_played = match_date
         if score_diff is not None:
             self.score_diffs.append(score_diff)
+        bucket = tier_bucket(tier)
+        rec = self.tier_record[bucket]
+        rec[1] += 1
+        if won:
+            rec[0] += 1
+        self.peak_tier = max(self.peak_tier, _TIER_ORD.get((tier or "").lower(), 0))
 
     def form(self, n: int) -> float | None:
         recent = list(self.results)[-n:]
@@ -83,6 +115,13 @@ class _TeamHistory:
             return None
         delta = now - self.last_played
         return max(delta.total_seconds() / 86400, 0)
+
+    def tier_exp(self, bucket: str) -> int:
+        return self.tier_record[bucket][1]
+
+    def tier_winrate(self, bucket: str) -> float | None:
+        wins, played = self.tier_record[bucket]
+        return wins / played if played else None
 
 
 @dataclass
@@ -148,6 +187,17 @@ def build_feature_df(min_matches_per_team: int = 3) -> pd.DataFrame:
         sd_a = ha.avg_score_diff()
         sd_b = hb.avg_score_diff()
 
+        # -- Tier experience / win-rate (point-in-time) --
+        tier_feats: dict[str, Any] = {}
+        for bucket in ("t1", "t2"):
+            tier_feats[f"{bucket}_exp_a"] = ha.tier_exp(bucket)
+            tier_feats[f"{bucket}_exp_b"] = hb.tier_exp(bucket)
+            tier_feats[f"{bucket}_wr_a"] = ha.tier_winrate(bucket)
+            tier_feats[f"{bucket}_wr_b"] = hb.tier_winrate(bucket)
+        tier_feats["peak_tier_a"] = ha.peak_tier
+        tier_feats["peak_tier_b"] = hb.peak_tier
+        tier_feats["peak_tier_diff"] = ha.peak_tier - hb.peak_tier
+
         # Label
         label = 1 if winner_id == team_a else 0
 
@@ -170,6 +220,7 @@ def build_feature_df(min_matches_per_team: int = 3) -> pd.DataFrame:
             "winner": label,
             **elo_feats,
             **form_feats,
+            **tier_feats,
         }
         records.append(rec)
 
@@ -179,8 +230,8 @@ def build_feature_df(min_matches_per_team: int = 3) -> pd.DataFrame:
             score_diff = float(score_a - score_b)
 
         won_a = winner_id == team_a
-        ha.add(won_a, match_date, score_diff)
-        hb.add(not won_a, match_date, -score_diff if score_diff is not None else None)
+        ha.add(won_a, match_date, score_diff, tier)
+        hb.add(not won_a, match_date, -score_diff if score_diff is not None else None, tier)
         h2h.add(winner_id)
 
     df = pd.DataFrame(records)
