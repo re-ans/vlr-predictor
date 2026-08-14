@@ -149,9 +149,14 @@ export default function MatchCard({ match }: { match: MatchOut }) {
         </div>
         <div className="text-center shrink-0 px-1">
           {isFinished ? (
-            <span className="font-mono font-bold text-lg">
-              {match.score_a} &ndash; {match.score_b}
-            </span>
+            <div className="flex flex-col items-center">
+              <span className="font-mono font-bold text-lg">
+                {match.score_a} &ndash; {match.score_b}
+              </span>
+              <span className="text-[10px] text-muted leading-tight">
+                {formatDate(match.match_date)}
+              </span>
+            </div>
           ) : (
             <span className="text-xs text-muted">
               {formatDate(match.match_date)}

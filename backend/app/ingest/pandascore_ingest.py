@@ -235,3 +235,26 @@ def sync(max_pages: int | None = 3) -> RunStats:
     # Recent results: most-recent-first, bounded.
     _run("sync-results", ["past"], sort="-begin_at", max_pages=max_pages)
     return stats_all
+
+
+def sync_by_ids(pandascore_ids: list[int], batch_size: int = 100) -> RunStats:
+    """Fetch specific matches by PandaScore id and upsert them.
+
+    Used to resolve matches that dropped off the paginated ``past`` window
+    (e.g. old ``scheduled`` rows PandaScore has since marked ``finished``).
+    """
+    with ingestion_run(source="pandascore", job="sync-by-ids") as stats:
+        if not pandascore_ids:
+            return stats
+        with PandaScoreClient() as ps:
+            for i in range(0, len(pandascore_ids), batch_size):
+                chunk = pandascore_ids[i : i + batch_size]
+                raws = ps.get(
+                    "/valorant/matches",
+                    params={"filter[id]": ",".join(str(x) for x in chunk)},
+                )
+                parsed = [p for r in (raws or []) if (p := parse_match(r))]
+                if parsed:
+                    with session_scope() as session:
+                        _bulk_load(session, parsed, stats)
+        return stats

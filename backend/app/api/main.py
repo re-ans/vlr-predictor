@@ -219,14 +219,15 @@ def refresh_matches():
         from ..ingest.pandascore_ingest import sync
         stats = sync(max_pages=2)
 
-        # Clean up stale scheduled matches PandaScore still reports as not_started
-        _expire_stale_scheduled()
+        # Resolve stale scheduled matches that fell outside the paginated
+        # ``past`` window by fetching their real results by id.
+        resolved = _resolve_stale_scheduled()
 
         # Rebuild the Elo/stats cache so predictions reflect new results
         warm_cache()
         return {
             "synced": True,
-            "rows_updated": stats.rows_written,
+            "rows_updated": stats.rows_written + resolved,
             "errors": stats.errors,
         }
     except Exception as exc:
@@ -236,33 +237,27 @@ def refresh_matches():
         _sync_lock.release()
 
 
-def _expire_stale_scheduled(hours: int = 6) -> int:
-    """Mark scheduled matches whose start time passed more than ``hours`` ago
-    as finished/canceled so they don't keep showing as upcoming.
-
-    If scores/winner are present, treat as finished. If still 0-0 and no winner,
-    mark as canceled since PandaScore never reported a result.
+def _resolve_stale_scheduled(hours: int = 2) -> int:
+    """Fetch real results for scheduled matches whose start time passed >``hours``
+    ago (PandaScore has likely finished them, but they're beyond the recent
+    ``past`` pagination window). Returns the number of rows updated.
     """
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     with session_scope() as session:
-        stale = session.execute(
-            select(Match).where(
-                Match.status == "scheduled", Match.match_date < cutoff
+        rows = session.execute(
+            select(Match.pandascore_id).where(
+                Match.status == "scheduled",
+                Match.match_date < cutoff,
+                Match.pandascore_id.isnot(None),
             )
         ).scalars().all()
-        updated = 0
-        for m in stale:
-            if m.score_a is not None and m.score_b is not None and (
-                m.score_a > 1 or m.score_b > 1 or m.winner_id is not None
-            ):
-                m.status = "finished"
-            else:
-                m.status = "canceled"
-            updated += 1
-        session.commit()
-        if updated:
-            logger.info("Expired %s stale scheduled matches", updated)
-        return updated
+    ids = [int(x) for x in rows]
+    if not ids:
+        return 0
+    from ..ingest.pandascore_ingest import sync_by_ids
+    stats = sync_by_ids(ids)
+    logger.info("Resolved %s stale scheduled matches by id", stats.rows_written)
+    return stats.rows_written
 
 
 # ---------------------------------------------------------------------------
