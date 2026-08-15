@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(default="dev-insecure-change-me", alias="JWT_SECRET")
     jwt_expire_minutes: int = Field(default=60 * 24 * 7, alias="JWT_EXPIRE_MINUTES")
 
+    # Frontend (CORS)
+    frontend_url: str = Field(default="", alias="FRONTEND_URL")
+
     # Scope
     ingest_regions: str = Field(default="", alias="INGEST_REGIONS")
 
