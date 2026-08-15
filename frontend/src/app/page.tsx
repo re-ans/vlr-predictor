@@ -8,6 +8,7 @@ import {
   type MatchListResponse,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { usePolling } from "@/lib/usePolling";
 import MatchCard from "@/components/MatchCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import RegionFilter from "@/components/RegionFilter";
@@ -23,16 +24,28 @@ export default function HomePage() {
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const didSync = useRef(false);
 
+  function doRefresh() {
+    setSyncing(true);
+    refreshMatches()
+      .catch(() => {})
+      .finally(() => setSyncing(false));
+  }
+
   // Sync results from PandaScore once on mount
   useEffect(() => {
     if (!didSync.current) {
       didSync.current = true;
-      setSyncing(true);
-      refreshMatches()
-        .catch(() => {})
-        .finally(() => setSyncing(false));
+      doRefresh();
     }
   }, []);
+
+  // Poll for live score/status updates every 60s while the page is open
+  usePolling(() => {
+    doRefresh();
+    getUpcoming(1, 50, category || undefined, region || undefined)
+      .then(setData)
+      .catch(() => {});
+  }, 60_000);
 
   // Load saved match IDs for logged-in user
   useEffect(() => {

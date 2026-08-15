@@ -8,6 +8,7 @@ import {
   type MatchListResponse,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { usePolling } from "@/lib/usePolling";
 import MatchCard from "@/components/MatchCard";
 import CategoryFilter from "@/components/CategoryFilter";
 import RegionFilter from "@/components/RegionFilter";
@@ -23,15 +24,32 @@ export default function MatchesPage() {
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const didSync = useRef(false);
 
+  function loadPage() {
+    setLoading(true);
+    getMatches(page, 20, "finished", category || undefined, region || undefined)
+      .then(setData)
+      .finally(() => setLoading(false));
+  }
+
+  function doRefresh() {
+    setSyncing(true);
+    refreshMatches()
+      .catch(() => {})
+      .finally(() => setSyncing(false));
+  }
+
   useEffect(() => {
     if (!didSync.current) {
       didSync.current = true;
-      setSyncing(true);
-      refreshMatches()
-        .catch(() => {})
-        .finally(() => setSyncing(false));
+      doRefresh();
     }
   }, []);
+
+  // Poll for live score/status updates every 60s
+  usePolling(() => {
+    doRefresh();
+    loadPage();
+  }, 60_000);
 
   useEffect(() => {
     if (token) {
@@ -42,12 +60,9 @@ export default function MatchesPage() {
   }, [token]);
 
   useEffect(() => {
-    setLoading(true);
     const delay = syncing ? 1500 : 0;
     const timer = setTimeout(() => {
-      getMatches(page, 20, "finished", category || undefined, region || undefined)
-        .then(setData)
-        .finally(() => setLoading(false));
+      loadPage();
     }, delay);
     return () => clearTimeout(timer);
   }, [page, category, region, syncing]);

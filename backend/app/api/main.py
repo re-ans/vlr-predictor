@@ -201,7 +201,7 @@ def health():
 # Refresh (sync latest results from PandaScore)
 # ---------------------------------------------------------------------------
 
-_SYNC_COOLDOWN = 120  # seconds between syncs
+_SYNC_COOLDOWN = 30  # seconds between syncs
 _last_sync: float = 0.0
 _sync_lock = threading.Lock()
 
@@ -226,7 +226,7 @@ def refresh_matches():
     try:
         _last_sync = time.time()
         from ..ingest.pandascore_ingest import sync
-        stats = sync(max_pages=2)
+        stats = sync(max_pages=5)
 
         # Resolve stale scheduled matches that fell outside the paginated
         # ``past`` window by fetching their real results by id.
@@ -247,15 +247,16 @@ def refresh_matches():
 
 
 def _resolve_stale_scheduled(hours: int = 2) -> int:
-    """Fetch real results for scheduled matches whose start time passed >``hours``
-    ago (PandaScore has likely finished them, but they're beyond the recent
-    ``past`` pagination window). Returns the number of rows updated.
+    """Fetch real results for scheduled or running matches whose start time
+    passed >``hours`` ago (PandaScore has likely finished them, but they're
+    beyond the recent ``past`` pagination window). Returns the number of rows
+    updated.
     """
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     with session_scope() as session:
         rows = session.execute(
             select(Match.pandascore_id).where(
-                Match.status == "scheduled",
+                Match.status.in_("scheduled", "running"),
                 Match.match_date < cutoff,
                 Match.pandascore_id.isnot(None),
             )
