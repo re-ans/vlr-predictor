@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import aliased
 
+from ..config import settings
 from ..db.base import session_scope
 from ..db.models import Event, Match, Team
 from datetime import datetime, timedelta, timezone
