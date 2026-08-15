@@ -3,7 +3,7 @@ services:
     name: vlr-predictor-api
     runtime: docker
     plan: free
-    rootDir: backend
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: DATABASE_URL
         sync: false
