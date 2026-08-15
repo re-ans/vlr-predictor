@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://vlr-predictor-api.onrender.com/"
+      "destination": "https://vlr-predictor-api.onrender.com/api/:path*"
     }
   ]
 }
