@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: vlr-predictor-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PANDASCORE_TOKEN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: MODEL_URL
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
